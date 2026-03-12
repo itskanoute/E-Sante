@@ -1,0 +1,38 @@
+const ordonnanceService = require('../services/ordonnance.service');
+
+const scanOrdonnance = async (req, res, next) => {
+  try {
+    const ordonnance = await ordonnanceService.scanOrdonnance(req.patient.id, req.file);
+    res.status(201).json({ success: true, data: ordonnance });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const validerOrdonnance = async (req, res, next) => {
+  try {
+    const result = await ordonnanceService.validerOrdonnance(
+      req.params.id,
+      req.patient.id,
+      req.patient,
+      req.body
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getAll = async (req, res, next) => {
+  try {
+    if (!req.patient?.id) {
+      return res.status(401).json({ success: false, message: 'Non authentifié' });
+    }
+    const ordonnances = await ordonnanceService.getAll(req.patient.id);
+    res.json({ success: true, data: ordonnances });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { scanOrdonnance, validerOrdonnance, getAll };
