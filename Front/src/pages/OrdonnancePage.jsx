@@ -14,7 +14,7 @@ import {
   FolderOpen, CalendarDays, CheckCircle, ImageOff, Smile,
 } from 'lucide-react';
 
-// URL de base du backend (sans /api) pour charger les images uploadées
+// URL de base du backend (sans /api) pour les images ; en dev on utilise le proxy (origine relative)
 const getApiBaseUrl = () => {
   const url = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
   const base = url.replace(/\/api\/?$/, '') || 'http://localhost:3000';
@@ -255,7 +255,16 @@ export default function OrdonnancePage() {
     if (files && files.length > 0) {
       scanMutation.mutate(files[0], {
         onSuccess: (data) => {
-          toast.success(`Ordonnance "${files[0].name}" scannée avec succès`);
+          const ordo = data?.data || data;
+          const medicaments = ordo?.donnees_parsees?.medicaments || [];
+          const n = medicaments.length;
+          if (n > 0) {
+            toast.success(`${n} médicament(s) extrait(s). Cliquez sur « Valider » sur l’ordonnance pour les ajouter à Mes traitements.`, { duration: 6000 });
+          } else if (ordo?.donnees_parsees?.raison_aucun_medicament === 'service_ia_indisponible') {
+            toast.error('Service Medical AI non démarré. Terminal : cd IA_E-Sante/medical-ai puis node server.js. Puis glissez à nouveau l\'image pour rescanner.', { duration: 12000 });
+          } else {
+            toast.success('Ordonnance enregistrée. Aucun médicament détecté — validez ou rescanner après avoir démarré le service IA.', { duration: 7000 });
+          }
         },
         onError: (err) => {
           toast.error(err.response?.data?.message || 'Erreur lors du scan de l\'ordonnance');
@@ -341,6 +350,7 @@ export default function OrdonnancePage() {
                       icon={CheckCircle}
                       onClick={() => handleValider(ordo.id)}
                       disabled={validerMutation.isPending}
+                      title="Marquer comme validée et créer les traitements si des médicaments ont été extraits"
                     >
                       Valider
                     </Button>

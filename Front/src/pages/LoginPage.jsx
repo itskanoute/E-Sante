@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import client from '../api/client';
-import ENDPOINTS from '../api/endpoints';
+import ENDPOINTS, { client } from '../api/endpoints';
 import styled from 'styled-components';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -213,6 +212,9 @@ export default function LoginPage() {
       navigate('/dashboard', { replace: true });
     } catch (err) {
       toast.error(err.response?.data?.message || 'Email ou mot de passe incorrect');
+      if (err.response?.data?.code === 'PASSWORD_RESET_SUGGESTED') {
+        toast.info('Utilisez « Mot de passe oublié » pour réinitialiser votre mot de passe.');
+      }
     } finally {
       setSubmitting(false);
     }

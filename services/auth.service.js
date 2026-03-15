@@ -1,16 +1,20 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { Patient } = require('../models');
+const { Patient, sequelize } = require('../models');
 const emailService = require('./email.service');
 
 const SALT_ROUNDS = 12;
+
+/** Email normalisé : minuscules + sans espaces (évite les échecs de connexion à cause de la casse). */
+const normalizeEmail = (email) => (email && typeof email === 'string' ? email.trim().toLowerCase() : '');
 
 /**
  * Inscription d'un nouveau patient
  */
 const register = async ({ email, password, nom, prenom, date_naissance, telephone }) => {
-  const existingPatient = await Patient.findOne({ where: { email } });
+  const emailNorm = normalizeEmail(email);
+  const existingPatient = await Patient.findOne({ where: { email: emailNorm } });
   if (existingPatient) {
     const error = new Error('Un compte avec cet email existe déjà');
     error.statusCode = 409;
@@ -20,7 +24,7 @@ const register = async ({ email, password, nom, prenom, date_naissance, telephon
   const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
 
   const patient = await Patient.create({
-    email,
+    email: emailNorm,
     password_hash,
     nom,
     prenom,
@@ -42,17 +46,43 @@ const register = async ({ email, password, nom, prenom, date_naissance, telephon
  * Connexion d'un patient
  */
 const login = async ({ email, password }) => {
-  const patient = await Patient.findOne({ where: { email } });
+  const emailNorm = normalizeEmail(email);
+  if (!emailNorm) {
+    const error = new Error('Email ou mot de passe incorrect');
+    error.statusCode = 401;
+    throw error;
+  }
+  // Recherche insensible à la casse (en base l'email peut être en majuscules ou mixte)
+  const patient = await Patient.findOne({
+    where: sequelize.where(sequelize.fn('LOWER', sequelize.col('email')), emailNorm),
+  });
   if (!patient) {
     const error = new Error('Email ou mot de passe incorrect');
     error.statusCode = 401;
     throw error;
   }
 
-  const isPasswordValid = await bcrypt.compare(password, patient.password_hash);
+  const pwd = typeof password === 'string' ? password.trim() : '';
+  const storedHash = patient.password_hash || '';
+  // Bcrypt = 60 caractères ; hash vide ou tronqué = impossible de vérifier le mot de passe
+  const hashInvalid = storedHash.length !== 60;
+  let isPasswordValid = false;
+  if (!hashInvalid) {
+    try {
+      isPasswordValid = await bcrypt.compare(pwd, storedHash);
+    } catch (_) {
+      isPasswordValid = false;
+    }
+  }
+
   if (!isPasswordValid) {
-    const error = new Error('Email ou mot de passe incorrect');
+    const error = new Error(
+      hashInvalid
+        ? 'Compte à réactiver : utilisez « Mot de passe oublié » pour définir un nouveau mot de passe.'
+        : 'Email ou mot de passe incorrect.'
+    );
     error.statusCode = 401;
+    if (hashInvalid) error.code = 'PASSWORD_RESET_SUGGESTED';
     throw error;
   }
 
@@ -95,7 +125,10 @@ const refreshToken = async (token) => {
  * Mot de passe oublié — Génère un token et envoie un email
  */
 const forgotPassword = async (email) => {
-  const patient = await Patient.findOne({ where: { email } });
+  const emailNorm = normalizeEmail(email);
+  const patient = await Patient.findOne({
+    where: sequelize.where(sequelize.fn('LOWER', sequelize.col('email')), emailNorm),
+  });
 
   // Pour des raisons de sécurité, on retourne toujours le même message
   // même si l'email n'existe pas (évite l'énumération des comptes)

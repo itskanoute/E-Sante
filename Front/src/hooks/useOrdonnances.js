@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import client from '../api/client';
-import ENDPOINTS from '../api/endpoints';
+import ENDPOINTS, { client } from '../api/endpoints';
 import { useAuth } from '../context/AuthContext';
 
 export function useOrdonnances() {
@@ -26,15 +25,19 @@ export function useScanOrdonnance() {
             });
             return data;
         },
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ordonnances'] }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['ordonnances'] });
+            queryClient.invalidateQueries({ queryKey: ['traitements'] });
+        },
     });
 }
 
 export function useValiderOrdonnance() {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: async ({ id, corrections }) => {
-            const { data } = await client.post(ENDPOINTS.ordonnances.valider(id), corrections);
+        mutationFn: async ({ id, corrections = [] }) => {
+            const body = Array.isArray(corrections) ? { corrections } : { corrections: [] };
+            const { data } = await client.post(ENDPOINTS.ordonnances.valider(id), body);
             return data;
         },
         onSuccess: () => {

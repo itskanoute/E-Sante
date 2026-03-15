@@ -381,7 +381,7 @@ export default function DashboardPage() {
             {tendancesLoading ? (
               <Spinner size={24} />
             ) : barData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minHeight={180}>
                 <BarChart data={barData} margin={{ top: 0, right: 0, left: -30, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
                   <XAxis dataKey="jour" tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} />

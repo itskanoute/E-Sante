@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Medical AI - Test ordonnance</title>
+  <style>
+    body { font-family: sans-serif; max-width: 600px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.25rem; }
+    form { margin: 1rem 0; }
+    input[type="file"] { margin: 0.5rem 0; display: block; }
+    button { padding: 0.5rem 1rem; background: #1a73e8; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    pre { background: #f5f5f5; padding: 1rem; overflow: auto; font-size: 0.85rem; border-radius: 4px; }
+    .error { color: #c5221f; }
+  </style>
+</head>
+<body>
+  <h1>Medical AI – Analyse d’ordonnance</h1>
+  <p>Uploadez une image d’ordonnance (JPEG, PNG…). Le texte sera extrait (OCR) puis analysé par Gemini.</p>
+  <form id="form">
+    <label for="image">Image :</label>
+    <input type="file" id="image" name="image" accept="image/*" required>
+    <button type="submit" id="btn">Analyser</button>
+  </form>
+  <div id="result"></div>
+  <script>
+    document.getElementById('form').onsubmit = async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('btn');
+      const result = document.getElementById('result');
+      btn.disabled = true;
+      result.innerHTML = 'Analyse en cours…';
+      try {
+        const formData = new FormData();
+        formData.append('image', document.getElementById('image').files[0]);
+        const r = await fetch('/analyze', { method: 'POST', body: formData });
+        const data = await r.json();
+        if (!r.ok) {
+          result.innerHTML = '<p class="error">' + (data.error || r.status) + '</p>';
+          return;
+        }
+        result.innerHTML = '<h2>Résultat</h2><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+      } catch (err) {
+        result.innerHTML = '<p class="error">' + err.message + '</p>';
+      } finally {
+        btn.disabled = false;
+      }
+    };
+  </script>
+</body>
+</html>

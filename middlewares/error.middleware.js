@@ -25,10 +25,9 @@ const errorMiddleware = (err, req, res, next) => {
   }
 
   const statusCode = err.statusCode || 500;
-  res.status(statusCode).json({
-    success: false,
-    message: err.message || 'Erreur interne du serveur',
-  });
+  const body = { success: false, message: err.message || 'Erreur interne du serveur' };
+  if (err.code) body.code = err.code;
+  res.status(statusCode).json(body);
 };
 
 module.exports = errorMiddleware;

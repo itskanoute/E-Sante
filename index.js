@@ -15,11 +15,31 @@ const { startPriseReminderScheduler } = require('./services/scheduler.service');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ==================== CORS (AVANT TOUT) ====================
+// Middleware manuel en premier : prérequête OPTIONS doit recevoir les en-têtes
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:'))) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+  next();
+});
+
 // ==================== MIDDLEWARES GLOBAUX ====================
 
-// Sécurité
-app.use(helmet());
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:5173', 'http://localhost:5174', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174'],
+  credentials: true,
+}));
+
+// Sécurité (après CORS)
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 
 // Rate limiting
 const limiter = rateLimit({
@@ -59,6 +79,14 @@ app.get('/', (req, res) => {
   });
 });
 
+// Vérification proxy / connexion backend (GET /api/health)
+app.get('/api/health', (req, res) => res.json({ ok: true, message: 'Backend OK' }));
+
+// Route login directe (évite 404 avec proxy Vite)
+const authController = require('./controllers/auth.controller');
+const { validate, loginSchema } = require('./middlewares/validation.middleware');
+app.post('/api/auth/login', validate(loginSchema), (req, res, next) => authController.login(req, res, next));
+
 app.use('/api', routes);
 
 // ==================== GESTION DES ERREURS ====================
@@ -82,8 +110,9 @@ const start = async () => {
     await sequelize.authenticate();
     console.log('Connexion MySQL établie avec succès.');
 
-    // Synchronisation des modèles (créer les tables si elles n'existent pas)
-    await sequelize.sync({ alter: process.env.NODE_ENV === 'development' });
+    // Synchronisation des modèles (créer les tables si elles n'existent pas).
+    // Ne pas utiliser alter: true pour éviter l'erreur MySQL "Trop de clefs (max 64)".
+    await sequelize.sync();
     console.log('Tables synchronisées.');
 
     startPriseReminderScheduler();
